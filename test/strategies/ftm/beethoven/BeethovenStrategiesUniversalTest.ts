@@ -16,7 +16,7 @@ const argv = require('yargs/yargs')()
       type: "boolean",
       default: false,
     },
-    onlyOneSpookyStrategyTest: {
+    onlyOneBeethovenStrategyTest: {
       type: "number",
       default: 1,
     },
@@ -28,11 +28,11 @@ const argv = require('yargs/yargs')()
 
 chai.use(chaiAsPromised);
 
-describe('Universal Spooky tests', async () => {
+describe('Universal Beethoven tests', async () => {
   if (argv.disableStrategyTests || argv.hardhatChainId !== 250) {
     return;
   }
-  const infos = readFileSync('scripts/utils/download/data/spooky_pools.csv', 'utf8').split(/\r?\n/);
+  const infos = readFileSync('scripts/utils/download/data/beethoven_pools.csv', 'utf8').split(/\r?\n/);
 
   const deployInfo: DeployInfo = new DeployInfo();
   before(async function () {
@@ -56,26 +56,26 @@ describe('Universal Spooky tests', async () => {
       console.log('skip', idx);
       return;
     }
-    if (argv.onlyOneSpookyStrategyTest !== -1 && +strat[0] !== argv.onlyOneSpookyStrategyTest) {
+    if (argv.onlyOneBeethovenStrategyTest !== -1 && +strat[0] !== argv.onlyOneBeethovenStrategyTest) {
       return;
     }
 
     console.log('strat', idx, lpName);
     /* tslint:disable:no-floating-promises */
-    startDefaultLpStrategyTest(
-      'StrategySpookySwapLp',
-      FtmAddresses.SPOOKY_SWAP_FACTORY,
-      lpAddress.toLowerCase(),
-      token0,
-      token0Name,
-      token1,
-      token1Name,
-      idx,
-      deployInfo,
-      100_000,
-      60 * 60 * 24,
-      false
-    );
+    // startDefaultLpStrategyTest(
+    //   'StrategySpookySwapLp',
+    //   FtmAddresses.SPOOKY_SWAP_FACTORY,
+    //   lpAddress.toLowerCase(),
+    //   token0,
+    //   token0Name,
+    //   token1,
+    //   token1Name,
+    //   idx,
+    //   deployInfo,
+    //   100_000,
+    //   60 * 60 * 24,
+    //   false
+    // );
   });
 
 
