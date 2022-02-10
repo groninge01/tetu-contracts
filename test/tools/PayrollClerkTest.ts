@@ -3,7 +3,7 @@ import chaiAsPromised from "chai-as-promised";
 import {SignerWithAddress} from "@nomiclabs/hardhat-ethers/signers";
 import {ethers} from "hardhat";
 import {TimeUtils} from "../TimeUtils";
-import {PayrollClerk, PriceCalculator} from "../../typechain";
+import {PayrollClerk, PriceCalculator, PayrollClerkV2, TetuProxyGov} from "../../typechain";
 import {DeployerUtils} from "../../scripts/deploy/DeployerUtils";
 import {CoreContractsWrapper} from "../CoreContractsWrapper";
 import {MintHelperUtils} from "../MintHelperUtils";
@@ -14,7 +14,7 @@ import {UniswapUtils} from "../UniswapUtils";
 const {expect} = chai;
 chai.use(chaiAsPromised);
 
-describe("Payroll Clerk tests", function () {
+describe.only("Payroll Clerk tests", function () {
   let snapshot: string;
   let snapshotForEach: string;
   let signer: SignerWithAddress;
@@ -191,6 +191,51 @@ describe("Payroll Clerk tests", function () {
     expect((await TokenUtils.balanceOf(core.rewardToken.address, clerk.address)).isZero()).is.eq(true);
     expect(await TokenUtils.balanceOf(core.rewardToken.address, signer.address))
       .is.eq(govBal.add(bal));
+  });
+
+  it("should add worker, pay worker, change wallet, upgrade contract, pay worker again & check worker storage", async () => {
+
+    // add worker
+    await clerk.addWorkers([signer.address], [100], ['Signer0'], ['TEST'], [true]);
+    expect(await clerk.workerIndex(signer.address)).is.eq(0);
+
+    // pay worker
+    await clerk.changeTokens([core.rewardToken.address], [100]);
+    await MintHelperUtils.mint(core.controller, core.announcer, '10000', signer.address);
+    await TokenUtils.transfer(core.rewardToken.address, signer, clerk.address, utils.parseUnits("1000").toString());
+    const balance = await TokenUtils.balanceOf(core.rewardToken.address, signer.address);
+    await clerk.pay(signer.address, 1);
+    expect(await TokenUtils.balanceOf(core.rewardToken.address, signer.address))
+      .eq(balance.add(utils.parseUnits("100")));
+
+    // change wallet
+    const newWallet = (await ethers.getSigners())[1];
+    await clerk.changeWorkerAddress(signer.address, newWallet.address);
+
+    // upgrade contract
+    const proxy = await DeployerUtils.connectContract(
+      signer, 'TetuProxyGov', clerk.address) as TetuProxyGov;
+    const newLogic = await DeployerUtils.deployContract(signer, "PayrollClerkV2") as PayrollClerk;
+    await proxy.upgrade(newLogic.address);
+    const newClerk = await DeployerUtils.connectContract(
+      signer, 'PayrollClerkV2', clerk.address) as PayrollClerkV2;
+
+    // pay worker again
+    const balanceNew = await TokenUtils.balanceOf(core.rewardToken.address, newWallet.address);
+    await clerk.pay(newWallet.address, 1);
+    expect(await TokenUtils.balanceOf(core.rewardToken.address, newWallet.address))
+      .eq(balanceNew.add(utils.parseUnits("100")));
+    
+    // check worker storage
+    expect(await newClerk.isPayer(signer.address)).is.eq(false);
+    expect(await newClerk.workerIndex(newWallet.address)).is.eq(0);
+    expect(await newClerk.baseHourlyRates(newWallet.address)).is.eq(100);
+    expect(await newClerk.workedHours(newWallet.address)).is.eq(2);
+    expect(await newClerk.earned(newWallet.address)).is.eq('200000000000000000000');
+    expect(await newClerk.workerNames(newWallet.address)).is.eq('Signer0');
+    expect(await newClerk.workerRoles(newWallet.address)).is.eq('TEST');
+    expect(await newClerk.boostActivated(newWallet.address)).is.eq(true);
+
   });
 
 });
